@@ -26,6 +26,10 @@ install() {
     mkdir -p "$CURSOR_RULES_DIR"
     mkdir -p "$LOCAL_BIN_DIR"
 
+    # Create reference file pointing to this repo
+    echo "$SCRIPT_DIR" > "$HOME/.cursor/cursor-config-location"
+    info "Created cursor-config-location reference"
+
     # Symlink rules
     for rule in "$SCRIPT_DIR/rules/"*.mdc; do
         if [ -f "$rule" ]; then
@@ -73,6 +77,12 @@ install() {
 uninstall() {
     echo "Uninstalling cursor-config..."
     echo ""
+
+    # Remove reference file
+    if [ -f "$HOME/.cursor/cursor-config-location" ]; then
+        rm "$HOME/.cursor/cursor-config-location"
+        info "Removed cursor-config-location reference"
+    fi
 
     # Remove rule symlinks
     for rule in "$SCRIPT_DIR/rules/"*.mdc; do

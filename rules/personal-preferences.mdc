@@ -5,6 +5,54 @@ alwaysApply: true
 
 # Personal Preferences & Autonomous Context
 
+## Managing Global Rules
+
+**IMPORTANT:** Global rules are managed in a git repository, NOT directly in `~/.cursor/rules/`.
+
+To find the cursor-config project location:
+```bash
+cat ~/.cursor/cursor-config-location
+# Returns: /path/to/cursor-config
+```
+
+### When Creating New Global Rules
+
+If you need to create a new rule that applies across all projects:
+
+1. **Find the cursor-config repo:**
+   ```bash
+   CURSOR_CONFIG=$(cat ~/.cursor/cursor-config-location)
+   ```
+
+2. **Create the rule in the repo:**
+   ```bash
+   cat > "$CURSOR_CONFIG/rules/new-rule-name.mdc" << 'EOF'
+   ---
+   description: What this rule does
+   alwaysApply: true
+   ---
+   # Rule content here
+   EOF
+   ```
+
+3. **Run setup to create symlink:**
+   ```bash
+   cd "$CURSOR_CONFIG" && ./setup.sh
+   ```
+
+4. **Commit and push:**
+   ```bash
+   cd "$CURSOR_CONFIG" && git add -A && git commit -m "Add new-rule-name" && git push
+   ```
+
+**DO NOT** create files directly in `~/.cursor/rules/` - they won't be version controlled or synced.
+
+### Project-Specific Rules (Fever, etc.)
+
+For project-specific rules that shouldn't be public:
+- Create them directly in `~/.cursor/rules/` (not symlinked)
+- Or in the project's own `.cursor/rules/` directory
+
 ## Session Start Protocol
 
 At the start of EVERY session in a git repository, silently run:
