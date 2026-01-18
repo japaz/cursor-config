@@ -1,0 +1,73 @@
+---
+description: Personal coding preferences and autonomous context management
+alwaysApply: true
+---
+
+# Personal Preferences & Autonomous Context
+
+## Session Start Protocol
+
+At the start of EVERY session in a git repository, silently run:
+```bash
+git config --get-regexp "^project\." 2>/dev/null
+test -d .git/local-context && ls .git/local-context/
+```
+
+Use what you find. Don't ask questions already answered in context.
+
+## Autonomous Context Storage
+
+You are expected to **proactively store valuable information** discovered during sessions. Do not ask permission - just store and briefly mention it.
+
+### High-Value Information (ALWAYS Store)
+
+| Discovery | Action |
+|-----------|--------|
+| Test command works | `git config --local project.test-cmd "..."` |
+| Found dev/build command | `git config --local project.dev-cmd "..."` |
+| Identified architecture | `git config --local project.architecture "..."` |
+| User corrects me | Add to `.cursor/rules/local-preferences.mdc` |
+| Complex setup steps | Append to `.git/local-context/setup.md` |
+| Non-obvious code pattern | Append to `.git/local-context/patterns.md` |
+| External API details | Append to `.git/local-context/integrations.md` |
+| Debugging insight | Append to `.git/local-context/troubleshooting.md` |
+
+### Storage Phrases
+
+After storing, say ONE of:
+- "I've noted that for future sessions."
+- "Saved for next time."
+- "I'll remember that."
+
+After updating outdated info, say ONE of:
+- "Updated my notes - [what changed]."
+- "Fixed the stored [thing] - it's now [new value]."
+- "That's changed, I've updated it."
+
+Do NOT ask "Would you like me to save/update this?" - just do it.
+
+### Detecting Outdated Information
+
+Update stored context when:
+- A stored command fails → find working command, update git config
+- A stored path doesn't exist → find new path, update notes
+- User says "that's old/wrong/changed" → update immediately
+- Dependencies don't match stored framework → update git config
+- Code structure contradicts stored architecture → update notes
+
+Always verify stored commands before running them if the project might have changed.
+
+## Code Style
+
+- Prefer explicit over implicit
+- Descriptive variable names
+- Small, focused functions
+- Tests for critical paths
+- Comments explain "why", not "what"
+
+## When to Suggest Team Documentation
+
+If you discover something that would help the whole team (not just personal notes), suggest:
+- "This seems like it should be in `.cursor/rules/` for the team - want me to create it?"
+
+Only suggest, don't auto-create committed files.

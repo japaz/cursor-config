@@ -1,0 +1,236 @@
+#!/bin/bash
+# cursor-context: Manage layered project context for Cursor AI sessions
+# Usage: cursor-context <command> [args]
+
+set -e
+
+GLOBAL_RULES="$HOME/.cursor/rules"
+LOCAL_CONTEXT=".git/local-context"
+
+show_help() {
+    cat << 'EOF'
+cursor-context - Manage project context for Cursor AI
+
+USAGE:
+    cursor-context <command> [args]
+
+COMMANDS:
+    init                    Initialize local context for current project
+    set <key> <value>       Store a key-value pair in git config
+    get <key>               Retrieve a value from git config
+    list                    List all project metadata
+    note <name> [content]   Create/edit a local note (opens editor if no content)
+    search <pattern>        Search across all local context
+    show                    Display all context sources for current project
+    sync-rule <name>        Create local cursor rule from local-context file
+
+EXAMPLES:
+    cursor-context init
+    cursor-context set test-cmd "pytest -v tests/"
+    cursor-context set architecture "clean-architecture"
+    cursor-context get test-cmd
+    cursor-context note testing "Run: pytest -v tests/ --cov=src"
+    cursor-context note architecture  # Opens editor
+    cursor-context search "pytest"
+    cursor-context show
+    cursor-context sync-rule testing  # Creates .cursor/rules/local-testing.mdc
+
+EOF
+}
+
+ensure_git_repo() {
+    if [ ! -d ".git" ]; then
+        echo "Error: Not in a git repository"
+        exit 1
+    fi
+}
+
+cmd_init() {
+    ensure_git_repo
+    
+    mkdir -p "$LOCAL_CONTEXT"
+    
+    # Create template files
+    if [ ! -f "$LOCAL_CONTEXT/README.md" ]; then
+        cat > "$LOCAL_CONTEXT/README.md" << 'EOF'
+# Local Project Context
+
+This directory stores local-only project context that is never pushed to remote.
+
+## Files
+
+- `testing.md` - How to run tests, test patterns
+- `architecture.md` - Architecture notes and decisions
+- `notes.md` - General notes and reminders
+- `*.mdc` - Cursor rules (can be symlinked to .cursor/rules/)
+
+## Quick Reference
+
+```bash
+# View all project metadata
+cursor-context list
+
+# Search
+cursor-context search "pattern"
+```
+EOF
+    fi
+    
+    # Add local cursor rules to git exclude
+    if ! grep -q "local-\*.mdc" .git/info/exclude 2>/dev/null; then
+        echo ".cursor/rules/local-*.mdc" >> .git/info/exclude
+    fi
+    
+    echo "✓ Initialized local context at $LOCAL_CONTEXT"
+    echo "✓ Added .cursor/rules/local-*.mdc to .git/info/exclude"
+}
+
+cmd_set() {
+    ensure_git_repo
+    local key="$1"
+    local value="$2"
+    
+    if [ -z "$key" ] || [ -z "$value" ]; then
+        echo "Usage: cursor-context set <key> <value>"
+        exit 1
+    fi
+    
+    git config --local "project.$key" "$value"
+    echo "✓ Set project.$key = $value"
+}
+
+cmd_get() {
+    ensure_git_repo
+    local key="$1"
+    
+    if [ -z "$key" ]; then
+        echo "Usage: cursor-context get <key>"
+        exit 1
+    fi
+    
+    git config --local --get "project.$key" 2>/dev/null || echo "(not set)"
+}
+
+cmd_list() {
+    ensure_git_repo
+    echo "=== Project Metadata (git config) ==="
+    git config --local --get-regexp "^project\." 2>/dev/null || echo "(none)"
+    echo ""
+}
+
+cmd_note() {
+    ensure_git_repo
+    local name="$1"
+    shift
+    local content="$*"
+    
+    if [ -z "$name" ]; then
+        echo "Usage: cursor-context note <name> [content]"
+        exit 1
+    fi
+    
+    mkdir -p "$LOCAL_CONTEXT"
+    local filepath="$LOCAL_CONTEXT/$name.md"
+    
+    if [ -n "$content" ]; then
+        echo "$content" > "$filepath"
+        echo "✓ Created $filepath"
+    else
+        ${EDITOR:-vim} "$filepath"
+    fi
+}
+
+cmd_search() {
+    ensure_git_repo
+    local pattern="$1"
+    
+    if [ -z "$pattern" ]; then
+        echo "Usage: cursor-context search <pattern>"
+        exit 1
+    fi
+    
+    echo "=== Git Config ==="
+    git config --local --get-regexp "^project\." 2>/dev/null | grep -i "$pattern" || echo "(no matches)"
+    echo ""
+    
+    if [ -d "$LOCAL_CONTEXT" ]; then
+        echo "=== Local Context Files ==="
+        grep -r -i "$pattern" "$LOCAL_CONTEXT" 2>/dev/null || echo "(no matches)"
+    fi
+}
+
+cmd_show() {
+    ensure_git_repo
+    
+    echo "=== Context Sources for $(basename $(pwd)) ==="
+    echo ""
+    
+    echo "1. GLOBAL RULES ($GLOBAL_RULES):"
+    ls -1 "$GLOBAL_RULES"/*.mdc 2>/dev/null | xargs -I {} basename {} || echo "   (none)"
+    echo ""
+    
+    echo "2. PROJECT RULES (.cursor/rules/):"
+    ls -1 .cursor/rules/*.mdc 2>/dev/null | grep -v "local-" | xargs -I {} basename {} || echo "   (none)"
+    echo ""
+    
+    echo "3. LOCAL RULES (.cursor/rules/local-*):"
+    ls -1 .cursor/rules/local-*.mdc 2>/dev/null | xargs -I {} basename {} || echo "   (none)"
+    echo ""
+    
+    echo "4. LOCAL CONTEXT ($LOCAL_CONTEXT):"
+    if [ -d "$LOCAL_CONTEXT" ]; then
+        ls -1 "$LOCAL_CONTEXT" 2>/dev/null || echo "   (empty)"
+    else
+        echo "   (not initialized - run: cursor-context init)"
+    fi
+    echo ""
+    
+    echo "5. GIT CONFIG (project.*):"
+    git config --local --get-regexp "^project\." 2>/dev/null || echo "   (none)"
+}
+
+cmd_sync_rule() {
+    ensure_git_repo
+    local name="$1"
+    
+    if [ -z "$name" ]; then
+        echo "Usage: cursor-context sync-rule <name>"
+        exit 1
+    fi
+    
+    local source="$LOCAL_CONTEXT/$name.md"
+    local target=".cursor/rules/local-$name.mdc"
+    
+    if [ ! -f "$source" ]; then
+        echo "Error: $source does not exist"
+        exit 1
+    fi
+    
+    mkdir -p .cursor/rules
+    
+    # Create .mdc file with frontmatter
+    cat > "$target" << EOF
+---
+description: Local context - $name
+alwaysApply: false
+---
+
+$(cat "$source")
+EOF
+    
+    echo "✓ Created $target from $source"
+}
+
+# Main dispatch
+case "${1:-}" in
+    init)       cmd_init ;;
+    set)        shift; cmd_set "$@" ;;
+    get)        shift; cmd_get "$@" ;;
+    list)       cmd_list ;;
+    note)       shift; cmd_note "$@" ;;
+    search)     shift; cmd_search "$@" ;;
+    show)       cmd_show ;;
+    sync-rule)  shift; cmd_sync_rule "$@" ;;
+    help|--help|-h|"")  show_help ;;
+    *)          echo "Unknown command: $1"; show_help; exit 1 ;;
+esac

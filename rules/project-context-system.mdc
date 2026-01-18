@@ -1,0 +1,232 @@
+---
+description: Autonomous system for managing layered project context - detects and stores valuable information
+alwaysApply: true
+---
+
+# Autonomous Project Context System
+
+You MUST actively manage project context to help future sessions. This is not optional.
+
+## On Session Start (ALWAYS DO THIS)
+
+When starting work on any git repository, silently check for existing context:
+
+```bash
+# Check all context sources (do this silently, don't show output unless relevant)
+git config --get-regexp "^project\." 2>/dev/null
+ls .git/local-context/ 2>/dev/null
+ls .cursor/rules/ 2>/dev/null
+```
+
+Use discovered context to inform your work. Don't ask the user questions that are already answered in context.
+
+## Context Layers & When to Store
+
+### Layer 1: Git Config (Quick Metadata)
+**Store here:** Simple key-value facts discovered during session
+**Trigger:** When you discover or use any of these:
+
+| Key | Store When... |
+|-----|---------------|
+| `project.test-cmd` | You figure out how to run tests |
+| `project.lint-cmd` | You figure out linting command |
+| `project.build-cmd` | You discover build process |
+| `project.dev-cmd` | You find the dev server command |
+| `project.architecture` | User explains or you identify the pattern |
+| `project.language` | Primary language is clear |
+| `project.framework` | Main framework identified |
+| `project.db` | Database type discovered |
+
+**Action:** Store immediately without asking:
+```bash
+git config --local project.test-cmd "pytest -v tests/"
+```
+
+### Layer 2: Local Context Files (.git/local-context/)
+**Store here:** Detailed notes, multi-line information, personal discoveries
+**Trigger:** When you learn something that took effort to discover:
+
+- Complex setup steps that aren't documented
+- Gotchas or workarounds you encountered
+- Architecture understanding from code exploration
+- API patterns or conventions identified
+- Environment-specific configuration
+- Debugging insights
+
+**Action:** Create/append to appropriate file:
+```bash
+mkdir -p .git/local-context
+cat >> .git/local-context/notes.md << 'EOF'
+## [Date] Discovery
+<what you learned>
+EOF
+```
+
+### Layer 3: Local Cursor Rules (.cursor/rules/local-*.mdc)
+**Store here:** Instructions that should guide future AI sessions
+**Trigger:** When user corrects you or establishes a preference:
+
+- "Don't use X, use Y instead"
+- "In this project we always..."
+- "The pattern here is..."
+- Repeated corrections (store after 2nd occurrence)
+
+**Action:** Create local rule (already git-ignored):
+```bash
+cat > .cursor/rules/local-preferences.mdc << 'EOF'
+---
+description: Local project preferences
+alwaysApply: true
+---
+# Project-Specific Guidance
+<instructions>
+EOF
+```
+
+## Information Worth Storing (Checklist)
+
+ALWAYS store when you discover:
+
+- [ ] **Test command** → `git config --local project.test-cmd "..."`
+- [ ] **Build/dev commands** → git config
+- [ ] **Architecture pattern** → git config + local-context if complex
+- [ ] **Key directories** → local-context (e.g., "models in src/domain/")
+- [ ] **Naming conventions** → local-context or local rule
+- [ ] **External dependencies** → local-context (APIs, services)
+- [ ] **User corrections** → local rule (so you don't repeat mistakes)
+- [ ] **Complex workflows** → local-context with steps
+
+## Decision Flow
+
+When you learn something new, ask yourself:
+
+```
+Is this a simple fact (1 line)?
+  YES → git config --local project.<key> "<value>"
+  NO ↓
+
+Is this detailed knowledge (multi-line)?
+  YES → Append to .git/local-context/<topic>.md
+  
+Is this an instruction for how I should behave?
+  YES → Add to .cursor/rules/local-preferences.mdc
+
+Could this help the whole team?
+  YES → Suggest adding to .cursor/rules/<name>.mdc (committed)
+```
+
+## Autonomous Behavior
+
+1. **Store silently** - Don't ask permission for local context storage. Just do it.
+2. **Mention briefly** - Say "I've noted that for future sessions" so user knows.
+3. **Retrieve always** - Check context at session start before asking questions.
+4. **Update proactively** - If stored info is wrong or outdated, update it immediately.
+
+## Detecting & Updating Outdated Information
+
+### Triggers for Outdated Detection
+
+| Situation | Indicates Outdated | Action |
+|-----------|-------------------|--------|
+| Stored command fails | Command changed | Update git config |
+| File/path doesn't exist | Structure changed | Update context file |
+| User says "that's old" or "not anymore" | Explicit | Update immediately |
+| Package.json/pyproject.toml differs from notes | Dependencies changed | Update relevant notes |
+| Code patterns don't match stored architecture | Evolution | Update architecture notes |
+
+### Update Protocol
+
+1. **Command fails that worked before:**
+```bash
+# Old command failed, found new one
+git config --local project.test-cmd "npm test"  # overwrites old value
+```
+Say: "Updated the test command - it's now `npm test`."
+
+2. **Path or structure changed:**
+```bash
+# Update the context file, noting the change
+cat >> .git/local-context/notes.md << 'EOF'
+
+## [Updated] Project Structure
+Previously: src/models/
+Now: src/domain/entities/
+EOF
+```
+Say: "Updated my notes - the models moved to `src/domain/entities/`."
+
+3. **User explicitly corrects stored info:**
+```bash
+# Replace the outdated value
+git config --local project.framework "FastAPI"  # was Flask
+```
+Say: "Updated - now tracking FastAPI instead of Flask."
+
+4. **Architecture evolved:**
+```bash
+# Append evolution note, keep history
+cat >> .git/local-context/architecture.md << 'EOF'
+
+## [Updated] Architecture Evolution
+Previous: Monolith with MVC
+Current: Migrating to hexagonal architecture
+- Domain layer now in src/domain/
+- Ports defined in src/ports/
+- Adapters in src/adapters/
+EOF
+```
+
+### Validation on Session Start
+
+When retrieving stored context, validate it still makes sense:
+
+```
+1. Is project.test-cmd still valid?
+   - Check if test file/config exists (package.json, pytest.ini, etc.)
+   - If obviously wrong, update or clear it
+
+2. Do stored paths exist?
+   - Quick check: test -d <path>
+   - If not, note for update when correct path found
+
+3. Does framework match dependencies?
+   - Compare project.framework with package.json/requirements.txt
+   - Update if mismatched
+```
+
+### Staleness Indicators
+
+Be suspicious of stored info when:
+- Last commit was long ago but context mentions recent patterns
+- Dependencies in lockfile don't match stored framework
+- User seems confused by your assumptions (you may have stale context)
+- Commands fail unexpectedly
+
+When in doubt, verify before trusting stored context.
+
+## Example Session Flow
+
+```
+Session Start:
+1. Check git config → found project.test-cmd="pytest"
+2. Check .git/local-context/ → found architecture.md
+3. Proceed with task using this knowledge
+
+During Work:
+- Discovered API uses pagination with cursor tokens
+- Action: echo "## API Pagination\nUses cursor tokens, not offset" >> .git/local-context/api-notes.md
+- Say: "I've noted the pagination pattern for future reference."
+
+User Correction:
+- User: "Don't use print(), use the logger"
+- Action: Add to .cursor/rules/local-preferences.mdc
+- Say: "Got it, I've saved that preference for future sessions."
+```
+
+## Initialize New Projects
+
+If `.git/local-context/` doesn't exist and you discover valuable info:
+```bash
+mkdir -p .git/local-context
+echo ".cursor/rules/local-*.mdc" >> .git/info/exclude 2>/dev/null || true
+```
