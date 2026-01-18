@@ -1,191 +1,77 @@
 ---
-description: Use gemini cli for tasks that require long context analysis or specialized AI capabilities
-alwaysApply: false
+description: Delegate large codebase analysis to Gemini CLI when context limits are exceeded
+alwaysApply: true
 ---
 
-You are a Gemini CLI manager specialized in delegating tasks to the Gemini CLI tool when specific advantages can be leveraged.
+# Gemini CLI Delegation
 
-Your sole responsibility is to:
-1. Identify when a task matches the "Gemini Advantage" criteria
-2. Format appropriate Gemini CLI commands
-3. Execute the Gemini CLI with proper parameters
-4. Return the results back to Claude/Cursor
-5. NEVER perform the analysis yourself - only manage the Gemini CLI
+You have access to `gemini` CLI for tasks that exceed your context window or require full-codebase analysis.
 
-## WHEN TO USE GEMINI CLI (The "Gemini Advantage"):
+## When to Use Gemini CLI (Check This First!)
 
-Use Gemini CLI when **ANY** of these conditions apply:
+**DELEGATE TO GEMINI when ANY of these apply:**
 
-### 1. **Context-Length Advantage**
-- Analysis requires reviewing >50 files or large codebases
-- Need to understand architectural patterns across entire projects
-- Tracing data flow through multiple layers/files
-- Understanding complex dependency graphs
+| Trigger | Example |
+|---------|---------|
+| Need to analyze >10 files | "Find all usages of X across the codebase" |
+| Full codebase understanding | "Explain the architecture" |
+| Pattern search at scale | "Find all API endpoints" |
+| Cross-module tracing | "How does data flow from A to B?" |
+| Security/quality audit | "Find potential vulnerabilities" |
+| Migration impact analysis | "What would break if we upgrade X?" |
 
-### 2. **Multimodal Analysis Advantage**
-- Need to analyze code with embedded images/screenshots in documentation
-- Processing codebases with diagram files (plantuml, mermaid, excalidraw)
-- Understanding visual design system implementations
-- Analyzing projects with mixed media documentation
+**HANDLE DIRECTLY when:**
+- Single file questions
+- Specific function/class questions
+- Tasks where you already have the relevant files in context
 
-### 3. **Code Search & Pattern Matching Advantage**
-- Finding specific patterns across thousands of files
-- Identifying all usages of a specific API or library
-- Locating deprecated patterns or security vulnerabilities
-- Cross-referencing similar implementations
+## How to Use
 
-### 4. **Comparative Analysis Advantage**
-- Comparing patterns between different parts of codebase
-- Analyzing evolution of code over time (if git history available)
-- Identifying inconsistencies across teams/modules
-- Benchmarking against best practices at scale
+```bash
+# Full codebase analysis
+gemini -C "$(pwd)" "Analyze the architecture of this codebase. Identify main components, patterns, and data flow."
 
-### 5. **Specialized Knowledge Advantage**
-- Tasks involving Google Cloud services integration
-- Android/iOS mobile code analysis
-- Firebase implementations
-- TensorFlow/PyTorch ML codebases
-- WebGPU/WebGL graphics programming
+# Specific pattern search
+gemini -C "$(pwd)" "Find all REST API endpoints. List each with its path, method, and handler function."
 
-### 6. **Documentation & Knowledge Extraction Advantage**
-- Generating comprehensive project documentation
-- Extracting business logic from complex implementations
-- Creating onboarding guides from codebase analysis
-- Identifying undocumented assumptions or "tribal knowledge"
+# Targeted analysis (specific directory)
+gemini -C "$(pwd)/src/domain" "Explain the domain model and entity relationships."
+```
 
-### 7. **Testing & Quality Analysis Advantage**
-- Analyzing test coverage gaps across entire suite
-- Identifying untested edge cases in complex logic
-- Reviewing test patterns and duplication
-- Security vulnerability scanning at scale
+## Command Pattern
 
-## Decision Flow:
-1. Is this asking for analysis of >10 files or complex patterns? → Use Gemini
-2. Does this require understanding relationships across modules? → Use Gemini
-3. Is this a simple single-file question? → Handle directly
-4. Does this leverage a Gemini specialty (multimodal, long-context)? → Use Gemini
-5. Would this benefit from Google-specific knowledge? → Use Gemini
+```bash
+gemini -C "$(pwd)" "<specific, detailed prompt>"
+```
 
-## Prompt Engineering Tips:
-- **Be specific**: "Find ALL instances where..." not "Look for..."
-- **Request structured output**: "Organize findings by category/severity/module"
-- **Ask for examples**: "Include code snippets showing each pattern"
-- **Request prioritization**: "Rank findings by impact/effort to fix"
-- **Ask for metrics**: "Count occurrences of each pattern found"
+**Prompt tips:**
+- Be specific: "Find ALL instances of..." not "Look for..."
+- Request structure: "List as a table with columns..."
+- Ask for locations: "Include file paths and line numbers"
 
-## Command Variations:
-- For focused analysis: `gemini list "src/**/*.tsx" | gemini chat`
-- For excluding files: `gemini list --all | grep -v "test\|spec" | gemini chat`
-- For iterative exploration: `gemini list --all | gemini interactive`
-- For model selection: `gemini list --all | gemini chat --model gemini-1.5-pro` (when needed)
+## Integration with Context System
 
-When invoked:
-1. Assess if the request matches ANY "Gemini Advantage" criteria above
-2. If yes, construct the Gemini CLI command:
-   - Use `gemini list --all | gemini chat` for comprehensive analysis
-   - Add `--yes` to skip confirmations for read-only tasks
-   - Craft specific, focused prompts based on the advantage being leveraged
-3. Execute the command and return raw output
-4. Do NOT interpret or analyze results
+After Gemini provides insights about the codebase:
+1. Store key findings in `.git/local-context/`
+2. Create flow documents for features discovered
+3. Update glossary with domain terms learned
 
-## COMPREHENSIVE USE CASE EXAMPLES:
+**Example workflow:**
+```bash
+# 1. Ask Gemini about architecture
+gemini -C "$(pwd)" "Explain how user authentication works end-to-end"
 
-### 1. Pattern Detection
-**Request**: "Find all React hooks usage patterns"
-**Command**: `gemini list --all | gemini chat "Analyze this codebase and identify all React hooks usage patterns. Show how useState, useEffect, useContext, and custom hooks are being used. Include examples of best practices and potential issues."`
+# 2. Store the knowledge locally
+cursor-context flow authentication
+# (paste/summarize Gemini's findings)
+```
 
-**Request**: "Locate all database query patterns"
-**Command**: `gemini list --all | gemini chat --yes "Find all database query patterns in this codebase. Include SQL queries, ORM usage, connection handling, and any database-related utilities. Show the different approaches used."`
+## Quick Reference
 
-### 2. Architecture Analysis
-**Request**: "Provide an architectural overview of the application"
-**Command**: `gemini list --all | gemini chat "Analyze the overall architecture of this application. Identify the main components, data flow, directory structure, key patterns, and how different parts of the system interact. Focus on high-level organization and design decisions."`
-
-**Request**: "Analyze the component hierarchy and structure"
-**Command**: `gemini list --all | gemini chat "Examine the React component hierarchy and structure. Identify reusable components, layout patterns, prop drilling, state management approaches, and component composition patterns used throughout the application."`
-
-### 3. Code Quality Analysis
-**Request**: "Find potential performance bottlenecks"
-**Command**: `gemini list --all | gemini chat --yes "Analyze this codebase for potential performance bottlenecks. Look for expensive operations, inefficient data structures, unnecessary re-renders, large bundle sizes, and optimization opportunities."`
-
-**Request**: "Identify security vulnerabilities"
-**Command**: `gemini list --all | gemini chat "Scan this codebase for potential security vulnerabilities. Look for authentication issues, input validation problems, XSS vulnerabilities, unsafe data handling, and security best practices violations."`
-
-### 4. Technology Stack Analysis
-**Request**: "Identify all third-party dependencies and their usage"
-**Command**: `gemini list --all | gemini chat "Analyze all third-party dependencies and libraries used in this project. Show how each major dependency is utilized, identify any potential redundancies, outdated packages, or security concerns."`
-
-**Request**: "Map out the testing strategy and coverage"
-**Command**: `gemini list --all | gemini chat --yes "Examine the testing strategy used in this codebase. Identify test frameworks, testing patterns, test coverage areas, mocking strategies, and areas that might need more testing."`
-
-### 5. Feature Analysis
-**Request**: "Trace a specific feature implementation"
-**Command**: `gemini list --all | gemini chat "Trace the implementation of [specific feature] throughout the codebase. Show all files involved, data flow, API endpoints, UI components, and how the feature integrates with the rest of the system."`
-
-**Request**: "Find all API endpoints and their usage"
-**Command**: `gemini list --all | gemini chat "Catalog all API endpoints in this application. Include REST routes, GraphQL resolvers, tRPC procedures, their request/response patterns, authentication requirements, and how they're consumed by the frontend."`
-
-### 6. Migration and Refactoring Analysis
-**Request**: "Identify legacy code patterns that need modernization"
-**Command**: `gemini list --all | gemini chat --yes "Identify outdated or legacy code patterns that could be modernized. Look for old React patterns, deprecated APIs, inefficient implementations, and opportunities to use newer language features."`
-
-**Request**: "Analyze consistency across similar components"
-**Command**: `gemini list --all | gemini chat "Examine similar components or modules for consistency. Identify variations in patterns, naming conventions, implementation approaches, and opportunities for standardization or creating reusable abstractions."`
-
-### 7. Documentation and Knowledge Transfer
-**Request**: "Generate onboarding documentation insights"
-**Command**: `gemini list --all | gemini chat "Analyze this codebase to help create onboarding documentation. Identify key concepts developers need to understand, important files and directories, setup requirements, and the most critical patterns to learn first."`
-
-### 8. **Cross-Language Analysis**
-**Request**: "How does error handling differ between our Python backend and JavaScript frontend?"
-**Command**: `gemini list --all | gemini chat "Compare error handling patterns between Python and JavaScript files in this codebase. Identify differences in exception handling, error logging, user feedback, and recovery strategies between backend and frontend."`
-
-### 9. **Migration Impact Analysis**
-**Request**: "What would be affected if we upgrade React from v17 to v18?"
-**Command**: `gemini list --all | gemini chat --yes "Analyze all React components to identify patterns that would be affected by upgrading from React 17 to React 18. Look for: use of deprecated APIs, concurrent mode compatibility, strict mode issues, and any patterns that leverage React 17-specific features."`
-
-### 10. **Performance Hotspot Identification**
-**Request**: "Find the most computationally expensive operations"
-**Command**: `gemini list --all | gemini chat "Analyze this codebase to identify computational hotspots. Look for: nested loops, expensive algorithms (O(n²) or worse), large data processing, memory-intensive operations, and blocking I/O calls in performance-critical paths."`
-
-### 11. **Architecture Debt Assessment**
-**Request**: "Identify architectural technical debt"
-**Command**: `gemini list --all | gemini chat "Identify architectural technical debt across the entire codebase. Look for: tight coupling between modules, circular dependencies, violation of separation of concerns, monolithic patterns in modular code, and scalability bottlenecks in the current architecture."`
-
-### 12. **Library Migration Analysis**
-**Request**: "What would it take to switch from Redux to Zustand?"
-**Command**: `gemini list --all | gemini chat --yes "Analyze Redux usage patterns throughout this codebase to assess migration effort to Zustand. Identify: store structure, middleware usage, selector patterns, async action handling, component connectivity, and estimate complexity of migration for each pattern found."`
-
-### 13. **Accessibility Audit**
-**Request**: "Find accessibility issues in our UI components"
-**Command**: `gemini list --all | gemini chat "Audit all UI components for accessibility issues. Look for: missing ARIA labels, keyboard navigation problems, color contrast issues, screen reader compatibility, focus management, and WCAG compliance violations in component implementations."`
-
-### 14. **Internationalization Analysis**
-**Request**: "How is i18n implemented and where are hardcoded strings?"
-**Command**: `gemini list --all | gemini chat "Analyze internationalization implementation across the codebase. Identify: i18n framework usage patterns, hardcoded strings that should be localized, translation key management, locale switching logic, and areas needing i18n improvement."`
-
-### 15. **Authentication & Authorization Audit**
-**Request**: "Review all auth mechanisms and permissions"
-**Command**: `gemini list --all | gemini chat "Conduct comprehensive security audit of authentication and authorization. Identify: all auth mechanisms, permission checks, role-based access control, token handling, session management, and potential security gaps in access control."`
-
-### 16. **Data Flow Visualization**
-**Request**: "How does data flow from API to UI components?"
-**Command**: `gemini list --all | gemini chat "Trace and map data flow from API endpoints through to UI components. Identify: API response handling, state management integration, prop drilling patterns, data transformation layers, caching mechanisms, and data synchronization strategies."`
-
-### 17. **Code Style Consistency Check**
-**Request**: "Find inconsistencies in code style and patterns"
-**Command**: `gemini list --all | gemini chat "Analyze code style consistency across the entire codebase. Look for: inconsistent naming conventions, varying file/folder structures, different error handling approaches, mixed architectural patterns, and deviations from established coding standards."`
-
-### 18. **Dependency Version Analysis**
-**Request**: "Which dependencies have conflicting versions?"
-**Command**: `gemini list --all | gemini chat "Analyze all dependency declarations to identify version conflicts, deprecated packages, security vulnerabilities, and update opportunities. Focus on: conflicting transitive dependencies, outdated major versions, and compatibility issues between packages."`
-
-### 19. **Configuration Analysis**
-**Request**: "How are different environments configured?"
-**Command**: `gemini list --all | gemini chat "Analyze configuration management across environments. Identify: environment-specific configs, secrets handling, build configurations, deployment settings, and configuration patterns across development, staging, and production."`
-
-### 20. **Monitoring & Observability Audit**
-**Request**: "What logging and monitoring patterns exist?"
-**Command**: `gemini list --all | gemini chat "Audit monitoring and observability implementation. Identify: logging patterns, metrics collection, error tracking, performance monitoring, alert configurations, and gaps in observability coverage across services."`
-
-Remember: Your role is purely to construct and execute the appropriate Gemini CLI command based on Claude's request, then return the raw output. Never analyze, summarize, or interpret the results yourself. Recognize when Gemini's advantages (context, scale, specialization) should be leveraged vs. handling tasks directly.
+| Task | Command |
+|------|---------|
+| Architecture overview | `gemini -C "$(pwd)" "Analyze the overall architecture..."` |
+| Find patterns | `gemini -C "$(pwd)" "Find all instances of [pattern]..."` |
+| Trace feature | `gemini -C "$(pwd)" "Trace how [feature] is implemented..."` |
+| Security audit | `gemini -C "$(pwd)" "Identify potential security issues..."` |
+| Dependency analysis | `gemini -C "$(pwd)" "Analyze dependencies and their usage..."` |
