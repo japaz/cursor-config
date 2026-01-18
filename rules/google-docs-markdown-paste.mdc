@@ -1,0 +1,45 @@
+---
+description: Paste markdown content into Google Docs with proper formatting
+globs:
+alwaysApply: false
+---
+
+# Pasting Markdown into Google Docs
+
+## Overview
+
+Google Docs has a native feature to paste markdown content with proper formatting (headings, tables, code blocks, etc.). This is much simpler than using external converters.
+
+## Steps to Enable and Use
+
+### 1. Enable Markdown Support (One-time setup)
+
+1. Open Google Docs
+2. Go to **Tools** → **Preferences**
+3. Check **Enable Markdown**
+4. Click **OK**
+
+### 2. Paste Markdown Content
+
+1. Copy markdown text to clipboard
+2. In Google Docs, go to **Edit** → **Paste from Markdown**
+3. The markdown will be converted to formatted Google Docs content
+
+## Notes
+
+- This feature converts markdown syntax to Google Docs formatting:
+  - `#`, `##`, `###` → Headings
+  - `**bold**` → Bold text
+  - `*italic*` → Italic text
+  - `` `code` `` → Code formatting
+  - Tables → Google Docs tables
+  - Lists → Bulleted/numbered lists
+  - Code blocks → Formatted code blocks
+
+## Alternative: Export from Google Docs to Markdown
+
+The reverse is also possible using the **Docs to Markdown** add-on from the Google Workspace Marketplace.
+
+## Source
+
+This tip was discovered from Stack Overflow discussions about Google Docs markdown support.
