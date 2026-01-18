@@ -7,6 +7,44 @@ alwaysApply: true
 
 You MUST actively manage project context to help future sessions. This is not optional.
 
+## CRITICAL: Creating New Global Rules
+
+**STOP! Before creating ANY file in `~/.cursor/rules/`:**
+
+1. Check if it's a global rule (applies to all projects, not project-specific)
+2. If global, **NEVER create directly in `~/.cursor/rules/`**
+3. Instead, create in the cursor-config repo:
+
+```bash
+# Find the cursor-config repo location
+CURSOR_CONFIG=$(cat ~/.cursor/cursor-config-location 2>/dev/null)
+
+# If found, create rule there
+if [ -n "$CURSOR_CONFIG" ]; then
+    # Create the rule in the repo
+    cat > "$CURSOR_CONFIG/rules/<rule-name>.mdc" << 'EOF'
+    ---
+    description: <description>
+    alwaysApply: true
+    ---
+    <content>
+    EOF
+    
+    # Run setup to create symlink
+    cd "$CURSOR_CONFIG" && ./setup.sh
+    
+    # Commit and push
+    git add -A && git commit -m "Add <rule-name>" && git push
+fi
+```
+
+**Why?** Files created directly in `~/.cursor/rules/` are:
+- Not version controlled
+- Not synced across machines
+- May be overwritten by setup.sh
+
+**Exception:** Project-specific private rules (e.g., Fever) can be created directly in `~/.cursor/rules/`.
+
 ## On Session Start (ALWAYS DO THIS)
 
 When starting work on any git repository, silently check for existing context:
