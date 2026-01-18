@@ -24,16 +24,21 @@ COMMANDS:
     show                    Display all context sources for current project
     sync-rule <name>        Create local cursor rule from local-context file
 
+    # Knowledge capture commands
+    flow <name>             Create/edit a feature flow document
+    flows                   List all documented flows
+    glossary [term]         Add term to glossary or show all terms
+    entry <name>            Add/edit an entry point
+    qa <question>           Log a Q&A about the codebase
+
 EXAMPLES:
     cursor-context init
     cursor-context set test-cmd "pytest -v tests/"
-    cursor-context set architecture "clean-architecture"
-    cursor-context get test-cmd
-    cursor-context note testing "Run: pytest -v tests/ --cov=src"
-    cursor-context note architecture  # Opens editor
-    cursor-context search "pytest"
-    cursor-context show
-    cursor-context sync-rule testing  # Creates .cursor/rules/local-testing.mdc
+    cursor-context flow reschedule       # Document how reschedule works
+    cursor-context flows                 # List all documented flows
+    cursor-context glossary "slot"       # Define what "slot" means
+    cursor-context entry "add-new-api"   # Document where to start
+    cursor-context search "reschedule"   # Search all context
 
 EOF
 }
@@ -179,13 +184,28 @@ cmd_show() {
     
     echo "4. LOCAL CONTEXT ($LOCAL_CONTEXT):"
     if [ -d "$LOCAL_CONTEXT" ]; then
-        ls -1 "$LOCAL_CONTEXT" 2>/dev/null || echo "   (empty)"
+        ls -1 "$LOCAL_CONTEXT" 2>/dev/null | grep -v "^flows$" || echo "   (empty)"
     else
         echo "   (not initialized - run: cursor-context init)"
     fi
     echo ""
     
-    echo "5. GIT CONFIG (project.*):"
+    echo "5. DOCUMENTED FLOWS ($LOCAL_CONTEXT/flows/):"
+    if [ -d "$LOCAL_CONTEXT/flows" ]; then
+        ls -1 "$LOCAL_CONTEXT/flows"/*.md 2>/dev/null | xargs -I {} basename {} .md || echo "   (none)"
+    else
+        echo "   (none)"
+    fi
+    echo ""
+    
+    echo "6. KNOWLEDGE FILES:"
+    test -f "$LOCAL_CONTEXT/glossary.md" && echo "   ✓ glossary.md" || echo "   ✗ glossary.md"
+    test -f "$LOCAL_CONTEXT/entry-points.md" && echo "   ✓ entry-points.md" || echo "   ✗ entry-points.md"
+    test -f "$LOCAL_CONTEXT/code-map.md" && echo "   ✓ code-map.md" || echo "   ✗ code-map.md"
+    test -f "$LOCAL_CONTEXT/qa.md" && echo "   ✓ qa.md" || echo "   ✗ qa.md"
+    echo ""
+    
+    echo "7. GIT CONFIG (project.*):"
     git config --local --get-regexp "^project\." 2>/dev/null || echo "   (none)"
 }
 
@@ -221,6 +241,161 @@ EOF
     echo "✓ Created $target from $source"
 }
 
+cmd_flow() {
+    ensure_git_repo
+    local name="$1"
+    
+    if [ -z "$name" ]; then
+        echo "Usage: cursor-context flow <name>"
+        echo "Example: cursor-context flow reschedule"
+        exit 1
+    fi
+    
+    mkdir -p "$LOCAL_CONTEXT/flows"
+    local filepath="$LOCAL_CONTEXT/flows/$name.md"
+    
+    if [ ! -f "$filepath" ]; then
+        # Create template
+        cat > "$filepath" << EOF
+# ${name^} Flow
+
+## Summary
+<1-2 sentence description>
+
+## Entry Points
+- API: \`path/to/file.py\` → \`function_name()\`
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| \`path/to/file1.py\` | <what it does> |
+
+## Flow Sequence
+1. <Step 1>
+2. <Step 2>
+
+## Domain Concepts
+- **<Term>**: <definition>
+
+## Gotchas
+- <non-obvious behavior>
+
+## Related Features
+- <related feature>
+EOF
+        echo "✓ Created template at $filepath"
+    fi
+    
+    ${EDITOR:-vim} "$filepath"
+}
+
+cmd_flows() {
+    ensure_git_repo
+    
+    if [ -d "$LOCAL_CONTEXT/flows" ]; then
+        echo "=== Documented Flows ==="
+        for f in "$LOCAL_CONTEXT/flows"/*.md; do
+            if [ -f "$f" ]; then
+                name=$(basename "$f" .md)
+                summary=$(grep -A1 "^## Summary" "$f" 2>/dev/null | tail -1 | head -c 60)
+                echo "  $name: $summary..."
+            fi
+        done
+    else
+        echo "No flows documented yet. Create one with: cursor-context flow <name>"
+    fi
+}
+
+cmd_glossary() {
+    ensure_git_repo
+    local term="$1"
+    
+    mkdir -p "$LOCAL_CONTEXT"
+    local filepath="$LOCAL_CONTEXT/glossary.md"
+    
+    if [ ! -f "$filepath" ]; then
+        echo "# Domain Glossary" > "$filepath"
+        echo "" >> "$filepath"
+        echo "Project-specific terminology and concepts." >> "$filepath"
+        echo "" >> "$filepath"
+    fi
+    
+    if [ -z "$term" ]; then
+        # Show glossary
+        cat "$filepath"
+    else
+        # Add new term
+        cat >> "$filepath" << EOF
+
+### $term
+**Definition:** <what it means in this project>
+**Examples:** <concrete examples>
+**See also:** <related terms or files>
+EOF
+        echo "✓ Added '$term' template to glossary"
+        ${EDITOR:-vim} "+$" "$filepath"  # Open at end of file
+    fi
+}
+
+cmd_entry() {
+    ensure_git_repo
+    local name="$1"
+    
+    mkdir -p "$LOCAL_CONTEXT"
+    local filepath="$LOCAL_CONTEXT/entry-points.md"
+    
+    if [ ! -f "$filepath" ]; then
+        echo "# Entry Points Index" > "$filepath"
+        echo "" >> "$filepath"
+        echo "Quick reference for where to start common operations." >> "$filepath"
+        echo "" >> "$filepath"
+    fi
+    
+    if [ -z "$name" ]; then
+        cat "$filepath"
+    else
+        cat >> "$filepath" << EOF
+
+## $name
+**To understand:** Start at \`<file:function>\`
+**To modify:** Look at \`<file>\`
+**Tests:** \`<test file or command>\`
+**Related flows:** <link to flow doc>
+EOF
+        echo "✓ Added '$name' template to entry points"
+        ${EDITOR:-vim} "+$" "$filepath"
+    fi
+}
+
+cmd_qa() {
+    ensure_git_repo
+    local question="$1"
+    
+    mkdir -p "$LOCAL_CONTEXT"
+    local filepath="$LOCAL_CONTEXT/qa.md"
+    
+    if [ ! -f "$filepath" ]; then
+        echo "# Questions & Answers" > "$filepath"
+        echo "" >> "$filepath"
+        echo "Cached answers about the codebase." >> "$filepath"
+        echo "" >> "$filepath"
+    fi
+    
+    if [ -z "$question" ]; then
+        cat "$filepath"
+    else
+        cat >> "$filepath" << EOF
+
+## Q: $question
+**A:** <answer>
+**Evidence:** \`<file:line>\`
+**Date:** $(date +%Y-%m-%d)
+EOF
+        echo "✓ Added question template"
+        ${EDITOR:-vim} "+$" "$filepath"
+    fi
+}
+
 # Main dispatch
 case "${1:-}" in
     init)       cmd_init ;;
@@ -231,6 +406,11 @@ case "${1:-}" in
     search)     shift; cmd_search "$@" ;;
     show)       cmd_show ;;
     sync-rule)  shift; cmd_sync_rule "$@" ;;
+    flow)       shift; cmd_flow "$@" ;;
+    flows)      cmd_flows ;;
+    glossary)   shift; cmd_glossary "$@" ;;
+    entry)      shift; cmd_entry "$@" ;;
+    qa)         shift; cmd_qa "$@" ;;
     help|--help|-h|"")  show_help ;;
     *)          echo "Unknown command: $1"; show_help; exit 1 ;;
 esac

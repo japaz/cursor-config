@@ -15,10 +15,18 @@ When starting work on any git repository, silently check for existing context:
 # Check all context sources (do this silently, don't show output unless relevant)
 git config --get-regexp "^project\." 2>/dev/null
 ls .git/local-context/ 2>/dev/null
+ls .git/local-context/flows/ 2>/dev/null  # Feature flow documentation
 ls .cursor/rules/ 2>/dev/null
 ```
 
-Use discovered context to inform your work. Don't ask the user questions that are already answered in context.
+**Before exploring code for a feature**, check if documentation exists:
+```bash
+# If user asks about "reschedule", check for existing knowledge
+test -f .git/local-context/flows/reschedule.md && cat .git/local-context/flows/reschedule.md
+test -f .git/local-context/entry-points.md && grep -A5 -i "reschedule" .git/local-context/entry-points.md
+```
+
+Use discovered context to inform your work. Don't ask the user questions that are already answered in context. Don't re-explore code that's already documented.
 
 ## Context Layers & When to Store
 
